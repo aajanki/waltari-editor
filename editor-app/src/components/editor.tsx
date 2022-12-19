@@ -25,7 +25,7 @@ export class AnnotatingEditor extends React.Component<IProps, IState> {
     }
 
     onChangeHandler = async (content: string, delta: DeltaStatic, source: string, editor: UnprivilegedEditor) => {
-        const response = await fetch("http://localhost:8000/api/hello")
+        const response = await fetch("/api/hello")
         const helloResponse = await response.json();
         console.log(`on change API response: ${JSON.stringify(helloResponse)}`)
 
