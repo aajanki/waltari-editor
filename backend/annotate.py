@@ -134,6 +134,15 @@ class TextAnnotator:
             'annotated': annotated,
             'count_sentences': count_sents,
             'count_words': count_words,
-            'count_pass': sum(passive_sentences),
-            'count_adv': count_adv,
+            'count_passive_sentences': sum(passive_sentences),
+            'count_adverb_words': count_adv,
         }
+
+
+def text_from_delta(delta):
+    def get_inserted_text(op):
+        insert = op.get('insert')
+        assert insert is not None
+        return insert
+
+    return ''.join(get_inserted_text(x) for x in delta['ops'])
