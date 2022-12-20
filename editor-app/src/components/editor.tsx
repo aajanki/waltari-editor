@@ -9,29 +9,11 @@ AnnotatedBlot.blotName = 'annotate';
 AnnotatedBlot.tagName = 'mark';
 Quill.register('formats/annotate', AnnotatedBlot);
 
-interface IProps {
+interface AnnotatingEditorProps {
+    onCountsChange: (words: number, sentences: number, adverbs: number, passives: number) => void
 };
 
-interface IState {
-    content: string;
-    count_words: number,
-    count_sentences: number,
-    count_adverb_words: number,
-    count_passive_sentences: number,
-};
-
-export class AnnotatingEditor extends React.Component<IProps, IState> {
-    constructor(props: IProps) {
-        super(props);
-        this.state = {
-            content: '',
-            count_words: 0,
-            count_sentences: 0,
-            count_adverb_words: 0,
-            count_passive_sentences: 0,
-        };
-    }
-
+export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
     onChangeHandler = async (content: string, delta: DeltaStatic, source: string, editor: UnprivilegedEditor) => {
         const contents = editor.getContents();
 
@@ -47,15 +29,13 @@ export class AnnotatingEditor extends React.Component<IProps, IState> {
             body: JSON.stringify(requestBody)
         });
         const response = await rawResponse.json();
-        console.log(response);
 
-        this.setState({
-            content: content,
-            count_words: response.count_words,
-            count_sentences: response.count_sentences,
-            count_adverb_words: response.count_adverb_words,
-            count_passive_sentences: response.count_passive_sentences,
-        });
+        this.props.onCountsChange(
+            response.count_words,
+            response.count_sentences,
+            response.count_adverb_words,
+            response.count_passive_sentences
+        );
     }
 
     render() {
@@ -73,7 +53,6 @@ export class AnnotatingEditor extends React.Component<IProps, IState> {
             theme='snow'
             modules={modules}
             formats={formats}
-            value={this.state.content}
             onChange={this.onChangeHandler} />;
       }
 };

@@ -1,11 +1,12 @@
-import { AnnotatingEditor } from './components/editor'
+import { ChakraProvider } from '@chakra-ui/react'
 import './App.css';
+import { EditorView } from './components/editorview';
 
 function App() {
   return (
-    <div className="App">
-      <AnnotatingEditor />
-    </div>
+    <ChakraProvider>
+      <EditorView />
+    </ChakraProvider>
   );
 }
 
