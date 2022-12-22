@@ -2,11 +2,6 @@ import re
 import spacy
 from spacy.symbols import ADV, AUX, VERB
 
-LABEL_COLORS = {
-    'ADV': '#7aecec',
-    'PASS': '#feca74',
-}
-
 
 class TextAnnotator:
     def __init__(self):
@@ -40,18 +35,11 @@ class TextAnnotator:
             s = m.start()
             return text[:s], text[s:]
 
-    def annotated_span(self, text, label):
-        c = LABEL_COLORS.get(label)
-        if c is not None:
-            return text, label, c
-        else:
-            return text, label
-
     def analyze(self, text):
         def commit_running_text():
-            nonlocal running_text, annotated
+            nonlocal running_text, ops
             if running_text:
-                annotated.append(''.join(running_text))
+                ops.append({'insert': ''.join(running_text)})
                 running_text = []
 
         def append_annotated(text, label):
@@ -60,12 +48,18 @@ class TextAnnotator:
             commit_running_text()
 
             text_no_ws, trailing_ws = self.split_trailing_whitespace(text)
-            annotated.append(self.annotated_span(text_no_ws, label))
+            ops.append({
+                'insert': text_no_ws,
+                'attributes': {
+                    'annotate': True,
+                    'label': label
+                }
+            })
 
             if trailing_ws is not None:
                 running_text.append(trailing_ws)
 
-        annotated = []
+        ops = []
         running_text = []
         count_words = 0
         count_sents = 0
@@ -105,22 +99,22 @@ class TextAnnotator:
                     pass
 
             if t.pos == ADV:
-                append_annotated(t.text_with_ws, 'ADV')
+                append_annotated(t.text_with_ws, 'adv')
                 count_adv += 1
                 processed_i = t.i
             elif t.pos == AUX and t.head.pos == VERB and 'Pass' in t.head.morph.get('Voice') and not t.head.morph.get('Person[psor]'):
                 if self.is_aux_preceding_passive_verb(t):
                     text_span = ''.join(t.nbor(i).text_with_ws for i in range(0, t.head.i - t.i + 1))
-                    append_annotated(text_span, 'PASS')
+                    append_annotated(text_span, 'pass')
                     processed_i = t.head.i
                 else:
-                    append_annotated(t.text_with_ws, 'PASS')
+                    append_annotated(t.text_with_ws, 'pass')
                     processed_i = t.i
             elif t.pos == VERB and 'Pass' in t.morph.get('Voice') and not t.morph.get('Person[psor]'):
                 is_participle = 'Part' in t.morph.get('VerbForm')
                 has_aux = any(x.pos == AUX for x in t.children)
                 if (is_participle and has_aux) or not is_participle:
-                    append_annotated(t.text_with_ws, 'PASS')
+                    append_annotated(t.text_with_ws, 'pass')
                     count_pass += 1
                     passive_sentences[-1] = True
                     processed_i = t.i
@@ -131,7 +125,7 @@ class TextAnnotator:
         commit_running_text()
 
         return {
-            'annotated': annotated,
+            'delta': ops,
             'count_sentences': count_sents,
             'count_words': count_words,
             'count_passive_sentences': sum(passive_sentences),

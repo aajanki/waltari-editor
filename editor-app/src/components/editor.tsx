@@ -11,10 +11,27 @@ Quill.register('formats/annotate', AnnotatedBlot);
 
 interface AnnotatingEditorProps {
     onCountsChange: (words: number, sentences: number, adverbs: number, passives: number) => void
-};
+}
 
-export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
+interface AnnotatingEditorState {
+    value: any // FIXME
+}
+
+export class AnnotatingEditor extends React.Component<AnnotatingEditorProps, AnnotatingEditorState> {
+    constructor(props: AnnotatingEditorProps) {
+        super(props);
+
+        this.state = {
+            value: ''
+        };
+    }
+
     onChangeHandler = async (content: string, delta: DeltaStatic, source: string, editor: UnprivilegedEditor) => {
+        if (source !== 'user') {
+            this.setState({value: editor.getContents()});
+            return;
+        }
+
         const contents = editor.getContents();
 
         const requestBody = {
@@ -30,6 +47,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
         });
         const response = await rawResponse.json();
 
+        this.setState({value: response.delta});
         this.props.onCountsChange(
             response.count_words,
             response.count_sentences,
@@ -53,6 +71,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
             theme='snow'
             modules={modules}
             formats={formats}
+            value={this.state.value}
             onChange={this.onChangeHandler} />;
       }
 };
