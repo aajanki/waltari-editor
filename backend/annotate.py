@@ -79,7 +79,7 @@ class TextAnnotator:
         passive_sentences = [False]
 
         for t in doc:
-            if t.is_space:
+            if t.is_space or t.is_punct:
                 running_text.append(t.text_with_ws)
                 continue
 
