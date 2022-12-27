@@ -6,7 +6,9 @@ Running the backend:
 cd backend
 python3 -m venv venv
 source venv/bin/activate
+pip install wheel
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 uvicorn main:app --reload
 ```
@@ -18,4 +20,10 @@ cd editor-app
 npm install
 
 npm start
+```
+
+## Backend unit tests
+
+```
+python -m pytest
 ```

@@ -117,6 +117,9 @@ class TextAnnotator:
                     count_pass += 1
                     passive_sentences[-1] = True
                     processed_i = t.i
+                else:
+                    running_text.append(t.text_with_ws)
+                    processed_i = t.i
             else:
                 running_text.append(t.text_with_ws)
                 processed_i = t.i
