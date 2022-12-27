@@ -1,4 +1,4 @@
-import { Box, Card, CardBody, Flex, Spacer, Text } from '@chakra-ui/react'
+import { Box, Card, CardBody, Flex, Text } from '@chakra-ui/react'
 
 interface AnnotationSidebarProps {
     count_words: number
@@ -16,19 +16,16 @@ export function AnnotationSidebar(props: AnnotationSidebarProps) {
                     <Text>{props.count_words} sanaa</Text>
                     </CardBody>
                 </Card>
-                <Spacer />
                 <Card variant='outline'>
                     <CardBody>
-                    <Text>{props.count_sentences} lausetta</Text>
+                    <Text>{props.count_sentences} virkettä</Text>
                     </CardBody>
                 </Card>
-                <Spacer />
                 <Card variant='outline'>
                     <CardBody>
-                    <Text>{props.count_passive_sentences} passiivilausetta</Text>
+                    <Text>{props.count_passive_sentences} passiivivirkettä</Text>
                     </CardBody>
                 </Card>
-                <Spacer />
                 <Card variant='outline'>
                     <CardBody>
                     <Text>{props.count_adverb_words} seikkasanaa</Text>

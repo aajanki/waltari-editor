@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactQuill, { Quill, UnprivilegedEditor } from 'react-quill';
 import { DeltaStatic } from 'quill';
-import 'react-quill/dist/quill.snow.css';
+import './quill.snow.larger.css';
 
 let Inline = Quill.import('blots/inline');
 let Delta = Quill.import('delta')
