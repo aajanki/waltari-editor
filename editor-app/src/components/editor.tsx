@@ -4,17 +4,29 @@ import { DeltaStatic } from 'quill';
 import 'react-quill/dist/quill.snow.css';
 
 let Inline = Quill.import('blots/inline');
-class AnnotatedBlot extends Inline {}
-AnnotatedBlot.blotName = 'annotate';
-AnnotatedBlot.tagName = 'mark';
-Quill.register('formats/annotate', AnnotatedBlot);
+let Delta = Quill.import('delta')
+
+class PassiveBlot extends Inline {}
+PassiveBlot.blotName = 'passive';
+PassiveBlot.tagName = 'mark';
+PassiveBlot.className = 'annotation-passive';
+
+class AdverbBlot extends Inline {}
+AdverbBlot.blotName = 'adverb';
+AdverbBlot.tagName = 'mark';
+AdverbBlot.className = 'annotation-adverb';
+
+Quill.register({
+    'formats/adverb': AdverbBlot,
+    'formats/passive': PassiveBlot,
+});
 
 interface AnnotatingEditorProps {
     onCountsChange: (words: number, sentences: number, adverbs: number, passives: number) => void
 }
 
 interface AnnotatingEditorState {
-    value: any // FIXME
+    value: DeltaStatic
 }
 
 export class AnnotatingEditor extends React.Component<AnnotatingEditorProps, AnnotatingEditorState> {
@@ -22,7 +34,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps, Ann
         super(props);
 
         this.state = {
-            value: ''
+            value: new Delta()
         };
     }
 
@@ -32,10 +44,8 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps, Ann
             return;
         }
 
-        const contents = editor.getContents();
-
         const requestBody = {
-            delta: contents
+            delta: editor.getContents()
         };
         const rawResponse = await fetch('/api/annotate', {
             method: 'POST',
@@ -47,7 +57,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps, Ann
         });
         const response = await rawResponse.json();
 
-        this.setState({value: response.delta});
+        this.setState({value: new Delta(response.delta)});
         this.props.onCountsChange(
             response.count_words,
             response.count_sentences,
@@ -64,8 +74,8 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps, Ann
             ]
         };
         const formats = [
-            'bold', 'font', 'italic', 'annotate', 'link', 'size', 'underline', 'indent',
-            'list', 'direction'];
+            'bold', 'font', 'italic', 'link', 'size', 'underline', 'indent',
+            'list', 'direction', 'adverb', 'passive'];
 
         return <ReactQuill
             theme='snow'
