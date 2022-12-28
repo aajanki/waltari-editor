@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactQuill, { Quill, UnprivilegedEditor } from 'react-quill';
-import { DeltaStatic } from 'quill';
+import { DeltaStatic, DeltaOperation } from 'quill';
 import './quill.snow.larger.css';
 
 let Inline = Quill.import('blots/inline');
@@ -21,31 +21,32 @@ Quill.register({
     'formats/passive': PassiveBlot,
 });
 
+type SpanAnnotation = {
+    start: number;
+    length: number;
+    label: string;
+}
+
 interface AnnotatingEditorProps {
     onCountsChange: (words: number, sentences: number, adverbs: number, passives: number) => void
 }
 
-interface AnnotatingEditorState {
-    value: DeltaStatic
-}
+export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
 
-export class AnnotatingEditor extends React.Component<AnnotatingEditorProps, AnnotatingEditorState> {
+    generation: number;
+
+    editorRef: React.RefObject<ReactQuill>;
+
     constructor(props: AnnotatingEditorProps) {
         super(props);
 
-        this.state = {
-            value: new Delta()
-        };
+        this.generation = 0;
+        this.editorRef = React.createRef();
     }
 
-    onChangeHandler = async (content: string, delta: DeltaStatic, source: string, editor: UnprivilegedEditor) => {
-        if (source !== 'user') {
-            this.setState({value: editor.getContents()});
-            return;
-        }
-
+    fetchAnnotations = async (text: string) => {
         const requestBody = {
-            delta: editor.getContents()
+            text: text
         };
         const rawResponse = await fetch('/api/annotate', {
             method: 'POST',
@@ -55,15 +56,56 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps, Ann
             },
             body: JSON.stringify(requestBody)
         });
-        const response = await rawResponse.json();
+        return await rawResponse.json();
+    }
 
-        this.setState({value: new Delta(response.delta)});
-        this.props.onCountsChange(
-            response.count_words,
-            response.count_sentences,
-            response.count_adverb_words,
-            response.count_passive_sentences
-        );
+    onChangeHandler = async (content: string, delta: DeltaStatic, source: string, editor: UnprivilegedEditor) => {
+        if (source !== 'user') {
+            return;
+        }
+
+        this.generation += 1;
+        const currentGeneration = this.generation;
+
+        const response = await this.fetchAnnotations(editor.getText());
+
+        if (currentGeneration === this.generation) {
+            this.updateAnnotations(response.annotations);
+
+            this.props.onCountsChange(
+                response.count_words,
+                response.count_sentences,
+                response.count_adverb_words,
+                response.count_passive_sentences
+            );
+        }
+    }
+
+    updateAnnotations = (annotations: SpanAnnotation[]) => {
+        let i = 0;
+        let ops: DeltaOperation[] = [];
+
+        // Convert annotations API response to a Delta object
+        for (const annotation of annotations) {
+            let start = annotation.start;
+            let length = annotation.length;
+
+            if (i !== start) {
+                // Remove obsolete annotations
+                ops.push({retain: start - i, attributes: {passive: null, adverb: null}});
+            }
+
+            // Add the new annotation
+            ops.push({retain: length, attributes: {[annotation.label]: true}});
+
+            i = start + length;
+        }
+
+        const delta = new Delta(ops);
+        const editor = this.editorRef.current;
+        if (editor !== null) {
+            editor.getEditor().updateContents(delta, 'api');
+        }
     }
 
     render() {
@@ -81,7 +123,8 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps, Ann
             theme='snow'
             modules={modules}
             formats={formats}
-            value={this.state.value}
-            onChange={this.onChangeHandler} />;
+            onChange={this.onChangeHandler}
+            ref={this.editorRef}
+        />;
       }
 };

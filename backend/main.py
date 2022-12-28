@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from annotate import TextAnnotator, text_from_delta
+from annotate import TextAnnotator
 
 app = FastAPI()
 annotator = TextAnnotator()
@@ -22,18 +22,17 @@ app.add_middleware(
 
 
 class Contents(BaseModel):
-    delta: dict
+    text: str
 
 
 @app.get("/")
-async def read_root():
-    return {"Hello": "World"}
+async def root():
+    return 'Text annotation API'
 
 
 @app.post("/api/annotate")
 async def annotate(contents: Contents):
-    text = text_from_delta(contents.delta)
-    return annotator.analyze(text)
+    return annotator.analyze(contents.text)
 
 
 if __name__ == "__main__":

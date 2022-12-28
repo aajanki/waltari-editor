@@ -27,39 +27,16 @@ class TextAnnotator:
 
         return False
 
-    def split_trailing_whitespace(self, text):
-        m = re.search(r'\s*$', text)
-        if m is None:
-            return text, None
-        else:
-            s = m.start()
-            return text[:s], text[s:]
+    def annotation(self, start, text, label):
+        return {
+            'start': start,
+            'length': len(text),
+            'text': text,
+            'label': label,
+        }
 
     def analyze(self, text):
-        def commit_running_text():
-            nonlocal running_text, ops
-            if running_text:
-                ops.append({'insert': ''.join(running_text)})
-                running_text = []
-
-        def append_annotated(text, label):
-            nonlocal running_text
-
-            commit_running_text()
-
-            text_no_ws, trailing_ws = self.split_trailing_whitespace(text)
-            ops.append({
-                'insert': text_no_ws,
-                'attributes': {
-                    label: True
-                }
-            })
-
-            if trailing_ws is not None:
-                running_text.append(trailing_ws)
-
-        ops = []
-        running_text = []
+        annotations = []
         count_words = 0
         count_sents = 0
         count_adv = 0
@@ -79,7 +56,6 @@ class TextAnnotator:
 
         for t in doc:
             if t.is_space or t.is_punct:
-                running_text.append(t.text_with_ws)
                 continue
 
             count_words += 1
@@ -98,47 +74,35 @@ class TextAnnotator:
                     pass
 
             if t.pos == ADV:
-                append_annotated(t.text_with_ws, 'adverb')
+                annotations.append(self.annotation(t.idx, t.text, 'adverb'))
                 count_adv += 1
                 processed_i = t.i
             elif t.pos == AUX and t.head.pos == VERB and 'Pass' in t.head.morph.get('Voice') and not t.head.morph.get('Person[psor]'):
                 if self.is_aux_preceding_passive_verb(t):
                     text_span = ''.join(t.nbor(i).text_with_ws for i in range(0, t.head.i - t.i + 1))
-                    append_annotated(text_span, 'passive')
+                    text_span = re.sub(r'\s*$', '', text_span)
+                    annotations.append(self.annotation(t.idx, text_span, 'passive'))
                     processed_i = t.head.i
                 else:
-                    append_annotated(t.text_with_ws, 'passive')
+                    annotations.append(self.annotation(t.idx, t.text, 'passive'))
                     processed_i = t.i
             elif t.pos == VERB and 'Pass' in t.morph.get('Voice') and not t.morph.get('Person[psor]'):
                 is_participle = 'Part' in t.morph.get('VerbForm')
                 has_aux = any(x.pos == AUX for x in t.children)
                 if (is_participle and has_aux) or not is_participle:
-                    append_annotated(t.text_with_ws, 'passive')
+                    annotations.append(self.annotation(t.idx, t.text, 'passive'))
                     count_pass += 1
                     passive_sentences[-1] = True
                     processed_i = t.i
                 else:
-                    running_text.append(t.text_with_ws)
                     processed_i = t.i
             else:
-                running_text.append(t.text_with_ws)
                 processed_i = t.i
 
-        commit_running_text()
-
         return {
-            'delta': ops,
+            'annotations': annotations,
             'count_sentences': count_sents,
             'count_words': count_words,
             'count_passive_sentences': sum(passive_sentences),
             'count_adverb_words': count_adv,
         }
-
-
-def text_from_delta(delta):
-    def get_inserted_text(op):
-        insert = op.get('insert')
-        assert insert is not None
-        return insert
-
-    return ''.join(get_inserted_text(x) for x in delta['ops'])

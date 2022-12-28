@@ -1,27 +1,17 @@
 import pytest
 from annotate import TextAnnotator
 
-
-SIMPLE_TEST_CASES = [
-    'A',
-    'A ! ,(B)., C / = # %',
-    'Tule jo!',
-    'Koulussa on käytävä.',
-    'Koulussa opiskellaan.',
-    'Kolme poikaa kävel',
-    'Kolme poikaa käveli',
-    'Kolme poikaa käveli kadulla.',
+TEST_CASES = [
+    ('A', []),
+    ('A ! ,(B)., C / = # %', []),
+    ('Tule jo!', [{'start': 5, 'length': 2, 'text': 'jo', 'label': 'adverb'}]),
+    #('Koulussa on käytävä.', []),
+    ('Koulussa opiskellaan.', [{'start': 9, 'length': 11, 'text': 'opiskellaan', 'label': 'passive'}]),
 ]
 
 annotator = TextAnnotator()
 
-
-def get_text(annotation_result):
-    delta = annotation_result['delta']
-    return ''.join(x.get('insert', '') for x in delta)
-
-
-@pytest.mark.parametrize('text', SIMPLE_TEST_CASES)
-def test_keeps_plain_text(text):
+@pytest.mark.parametrize('text,expected_annotations', TEST_CASES)
+def test_simple_sentences(text, expected_annotations):
     analyzed = annotator.analyze(text)
-    assert get_text(analyzed) == text
+    assert analyzed['annotations'] == expected_annotations
