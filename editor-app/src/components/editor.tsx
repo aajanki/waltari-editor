@@ -138,7 +138,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
         // Update the annotations only, if the text hasn't changed since we called
         // the annotation API
         if (currentGeneration === this.generation) {
-            this.updateAnnotations(response.annotations);
+            this.updateAnnotations(response.annotations, text.length);
 
             this.props.onCountsChange(
                 response.count_words,
@@ -149,7 +149,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
         }
     }
 
-    updateAnnotations = (annotations: SpanAnnotation[]) : void => {
+    updateAnnotations = (annotations: SpanAnnotation[], textLength: number) : void => {
         let i = 0;
         let ops: DeltaOperation[] = [];
         const deleteAttributes = Object.fromEntries(annotationTypes.map(x => [x, null]));
@@ -168,6 +168,15 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
             ops.push({retain: length, attributes: {[annotation.label]: true}});
 
             i = start + length;
+        }
+
+        // Remove existing annotations in the remaining text after the last span
+        const lastAnnotationPos = annotations.length === 0
+            ? 0
+            : annotations[annotations.length - 1].start + annotations[annotations.length - 1].length;
+        const remainingCharCount = textLength - lastAnnotationPos;
+        if (remainingCharCount > 0) {
+            ops.push({retain: remainingCharCount, attributes: deleteAttributes});
         }
 
         const delta = new Delta(ops);
