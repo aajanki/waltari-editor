@@ -21,6 +21,8 @@ Quill.register({
     'formats/passive': PassiveBlot,
 });
 
+const annotationTypes = ['passive', 'adverb'];
+
 type SpanAnnotation = {
     start: number;
     length: number;
@@ -150,6 +152,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
     updateAnnotations = (annotations: SpanAnnotation[]) : void => {
         let i = 0;
         let ops: DeltaOperation[] = [];
+        const deleteAttributes = Object.fromEntries(annotationTypes.map(x => [x, null]));
 
         // Convert annotations API response to a Delta object
         for (const annotation of annotations) {
@@ -158,7 +161,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
 
             if (i !== start) {
                 // Remove obsolete annotations
-                ops.push({retain: start - i, attributes: {passive: null, adverb: null}});
+                ops.push({retain: start - i, attributes: deleteAttributes});
             }
 
             // Add the new annotation
@@ -183,7 +186,8 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
         };
         const formats = [
             'bold', 'font', 'italic', 'link', 'size', 'underline', 'indent',
-            'list', 'direction', 'adverb', 'passive'];
+            'list', 'direction'
+        ].concat(annotationTypes);
 
         return <ReactQuill
             theme='snow'
