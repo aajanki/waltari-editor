@@ -31,9 +31,47 @@ interface AnnotatingEditorProps {
     onCountsChange: (words: number, sentences: number, adverbs: number, passives: number) => void
 }
 
+function cancellableTimeout<T>(ms: number, value: T, options: { signal?: AbortSignal; } = {}) : Promise<T> {
+    return new Promise((resolve, reject) => {
+        const listener = () => {
+            clearTimeout(timer);
+            reject(options.signal?.reason);
+        };
+        options.signal?.throwIfAborted();
+        const timer = setTimeout(() => {
+            options.signal?.removeEventListener('abort', listener);
+            resolve(value);
+        }, ms);
+        options.signal?.addEventListener('abort', listener);
+    });
+}
+
+/**
+ * A Promise that is either completed after the specified amount of time or aborted.
+ * @param ms Delay in milliseconds
+ * @param abortSignal AbortSignal object that can be used to cancel the wait.
+ * @returns True, if waited for the specified time. False if the wait got cancelled before completion.
+ */
+async function wait(ms: number, abortSignal: AbortSignal): Promise<boolean> {
+    try {
+        await cancellableTimeout(ms, null, { signal: abortSignal });
+    } catch (e) {
+        if (e instanceof DOMException) {
+            // the wait was cancelled
+            return false;
+        } else {
+            throw e;
+        }
+    }
+
+    return true;
+}
+
 export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
 
     generation: number;
+
+    abortController: AbortController | undefined;
 
     editorRef: React.RefObject<ReactQuill>;
 
@@ -59,16 +97,44 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
         return await rawResponse.json();
     }
 
-    onChangeHandler = async (content: string, delta: DeltaStatic, source: string, editor: UnprivilegedEditor) => {
+    onChangeHandler = async (content: string, delta: DeltaStatic, source: string, editor: UnprivilegedEditor) : Promise<void> => {
         if (source !== 'user') {
             return;
         }
 
+        if (typeof this.abortController === 'object') {
+            // There were additional edits during the waiting period. Cancel
+            // the earlier timer to signal that it's not necessary to call the
+            // API for the previous change because they got obsoleted by this
+            // latest change.
+            this.abortController.abort();
+            this.abortController = undefined;
+        }
+
         this.generation += 1;
         const currentGeneration = this.generation;
+        const text = editor.getText();
 
-        const response = await this.fetchAnnotations(editor.getText());
+        // Wait for more edits for 300 milliseconds before calling the API.
+        this.abortController = new AbortController();
+        const waitCompleted = await wait(300, this.abortController.signal);
 
+        if (!waitCompleted) {
+            // Additional changes were made during the wait period. Discard 
+            // this generation.
+            return;
+        }
+
+        this.abortController = undefined;
+
+        return await this.annotate(text, currentGeneration);
+    }
+
+    annotate = async (text: string, currentGeneration: number) : Promise<void> => {
+        const response = await this.fetchAnnotations(text);
+
+        // Update the annotations only, if the text hasn't changed since we called
+        // the annotation API
         if (currentGeneration === this.generation) {
             this.updateAnnotations(response.annotations);
 
@@ -81,7 +147,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
         }
     }
 
-    updateAnnotations = (annotations: SpanAnnotation[]) => {
+    updateAnnotations = (annotations: SpanAnnotation[]) : void => {
         let i = 0;
         let ops: DeltaOperation[] = [];
 
@@ -126,5 +192,12 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
             onChange={this.onChangeHandler}
             ref={this.editorRef}
         />;
+      }
+
+      componentWillUnmount(): void {
+        if (typeof this.abortController === 'object') {
+            this.abortController.abort();
+            this.abortController = undefined;
+        }
       }
 };
