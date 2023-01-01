@@ -8,7 +8,7 @@ class TextAnnotator:
         self.nlp = self.load_nlp()
 
     def load_nlp(self):
-        return spacy.load('spacy_fi_experimental_web_md')
+        return spacy.load('spacy_fi_experimental_web_md', disable=['ner', 'lemmatizer'])
 
     def is_passive_voice(self, token):
         morph = token.morph
