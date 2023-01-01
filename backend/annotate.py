@@ -1,6 +1,23 @@
 import re
 import spacy
+from pydantic import BaseModel
 from spacy.symbols import ADV, AUX, VERB
+from typing import List
+
+
+class SpanAnnotation(BaseModel):
+    start: int
+    length: int
+    label: str
+    text: str
+
+
+class AnnotationResults(BaseModel):
+    annotations: List[SpanAnnotation]
+    count_words: int
+    count_sentences: int
+    count_adverb_words: int
+    count_passive_sentences: int
 
 
 class TextAnnotator:
@@ -28,15 +45,15 @@ class TextAnnotator:
         return False
 
     def annotation(self, start, text, label):
-        return {
-            'start': start,
-            'length': len(text),
-            'text': text,
-            'label': label,
-        }
+        return SpanAnnotation(
+            start=start,
+            length=len(text),
+            text=text,
+            label=label,
+        )
 
-    def analyze(self, text):
-        annotations = []
+    def analyze(self, text: str) -> AnnotationResults:
+        annotations: List[SpanAnnotation] = []
         count_words = 0
         count_sents = 0
         count_adv = 0
@@ -99,10 +116,10 @@ class TextAnnotator:
             else:
                 processed_i = t.i
 
-        return {
-            'annotations': annotations,
-            'count_sentences': count_sents,
-            'count_words': count_words,
-            'count_passive_sentences': sum(passive_sentences),
-            'count_adverb_words': count_adv,
-        }
+        return AnnotationResults(
+            annotations=annotations,
+            count_words=count_words,
+            count_sentences=count_sents,
+            count_passive_sentences=sum(passive_sentences),
+            count_adverb_words=count_adv,
+        )

@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from annotate import TextAnnotator
+from annotate import TextAnnotator, AnnotationResults
 
 app = FastAPI()
 annotator = TextAnnotator()
@@ -30,7 +30,7 @@ async def root():
     return 'Text annotation API'
 
 
-@app.post("/api/annotate")
+@app.post("/api/annotate", response_model=AnnotationResults)
 def annotate(contents: Contents):
     return annotator.analyze(contents.text)
 
