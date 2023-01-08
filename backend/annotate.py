@@ -2,6 +2,7 @@ import re
 import spacy
 from pydantic import BaseModel
 from spacy.symbols import ADV, AUX, VERB
+from spacy.tokens import Doc
 from typing import List
 
 
@@ -18,14 +19,17 @@ class AnnotationResults(BaseModel):
     count_sentences: int
     count_adverb_words: int
     count_passive_sentences: int
+    readability_long_words: float
 
 
 class TextAnnotator:
     def __init__(self):
-        self.nlp = self.load_nlp()
+        self.nlp = spacy.load('spacy_fi_experimental_web_md', disable=['ner'])
 
-    def load_nlp(self):
-        return spacy.load('spacy_fi_experimental_web_md', disable=['ner', 'lemmatizer'])
+        # hyphenate function from libvoikko
+        lemmatizer_index = self.nlp.pipe_names.index('lemmatizer')
+        lemmatizer = self.nlp.pipeline[lemmatizer_index][-1]
+        self.hyphenate = lemmatizer.voikko.hyphenate
 
     def is_passive_voice(self, token):
         morph = token.morph
@@ -122,4 +126,25 @@ class TextAnnotator:
             count_sentences=count_sents,
             count_passive_sentences=sum(passive_sentences),
             count_adverb_words=count_adv,
+            readability_long_words=self.readability_long_words(doc),
         )
+
+    def readability_long_words(self, doc: Doc) -> float:
+        # Readability score based on the frequency of long words (= words with
+        # more than four syllables in the lemmatized form).
+        #
+        # Reference: Osmo A. Wiio: Viestinnän perusteet, 1973, p. 142
+        count_words = 0
+        count_long_words = 0
+        lemmas = (t.lemma_ for t in doc if not (t.is_space or t.is_punct))
+        for lemma in lemmas:
+            count_words += 1
+
+            n = self.count_syllables(lemma)
+            if n >= 4:
+                count_long_words += 1
+
+        return 2.7 + 0.3 * count_long_words/count_words*100
+
+    def count_syllables(self, word: str) -> int:
+        return self.hyphenate(word).count('-') + 1
