@@ -30,7 +30,13 @@ type SpanAnnotation = {
 }
 
 interface AnnotatingEditorProps {
-    onCountsChange: (words: number, sentences: number, adverbs: number, passives: number) => void
+    onCountsChange: (
+        words: number,
+        sentences: number,
+        adverbs: number,
+        passives: number,
+        readability: number
+    ) => void
 }
 
 function cancellableTimeout<T>(ms: number, value: T, options: { signal?: AbortSignal; } = {}) : Promise<T> {
@@ -96,6 +102,11 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
             },
             body: JSON.stringify(requestBody)
         });
+
+        if (!rawResponse.ok) {
+            throw new Error(`Annotation request failed: ${rawResponse.status}`);
+        }
+
         return await rawResponse.json();
     }
 
@@ -144,7 +155,8 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
                 response.count_words,
                 response.count_sentences,
                 response.count_adverb_words,
-                response.count_passive_sentences
+                response.count_passive_sentences,
+                response.readability_long_words,
             );
         }
     }

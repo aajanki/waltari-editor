@@ -144,7 +144,11 @@ class TextAnnotator:
             if n >= 4:
                 count_long_words += 1
 
-        return 2.7 + 0.3 * count_long_words/count_words*100
+        if count_words < 10:
+            # Can't estimate from a short sample
+            return 7.0
+        else:
+            return 2.7 + 0.3 * count_long_words/count_words*100
 
     def count_syllables(self, word: str) -> int:
         return self.hyphenate(word).count('-') + 1
