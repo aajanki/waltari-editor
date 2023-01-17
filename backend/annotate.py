@@ -1,7 +1,7 @@
 import re
 import spacy
 from pydantic import BaseModel
-from spacy.symbols import ADV, AUX, VERB
+from spacy.symbols import ADJ, ADV, AUX, NOUN, VERB
 from spacy.tokens import Doc
 from typing import List
 
@@ -19,6 +19,7 @@ class AnnotationResults(BaseModel):
     count_sentences: int
     count_adverb_words: int
     count_passive_sentences: int
+    readability: float
     readability_long_words: float
 
 
@@ -120,35 +121,63 @@ class TextAnnotator:
             else:
                 processed_i = t.i
 
+        readability = self.readability(doc)
         return AnnotationResults(
             annotations=annotations,
             count_words=count_words,
             count_sentences=count_sents,
             count_passive_sentences=sum(passive_sentences),
             count_adverb_words=count_adv,
-            readability_long_words=self.readability_long_words(doc),
+            readability=readability['readability'],
+            readability_long_words=readability['readability_long_words'],
         )
 
-    def readability_long_words(self, doc: Doc) -> float:
-        # Readability score based on the frequency of long words (= words with
-        # more than four syllables in the lemmatized form).
+    def readability(self, doc: Doc) -> float:
+        # Compute readability scores for a text span.
         #
-        # Reference: Osmo A. Wiio: Viestinnän perusteet, 1973, p. 142
+        # Generated two scores that estimate text readability based on the 
+        # structural properties of the text. "Readability" is supposed to be
+        # more accurate, "readability_long_words" is slightly less accurate,
+        # but is simpler to calculate. These are the formulas 9 and 10 from 
+        # Osmo A. Wiio: "Readability, comprehension and readership", 1968,
+        # pp. 78.
+        #
+        # The scores quantify the readability as a grade level 1 - 12. Values
+        # above 9 are considered "difficult" and values below 6 are "easy".
         count_words = 0
         count_long_words = 0
-        lemmas = (t.lemma_ for t in doc if not (t.is_space or t.is_punct))
-        for lemma in lemmas:
+        count_adj_adv = 0
+        count_noun_verb = 0
+        word_tokens = (t for t in doc if not (t.is_space or t.is_punct))
+        for t in word_tokens:
             count_words += 1
 
-            n = self.count_syllables(lemma)
-            if n >= 4:
+            if self.count_syllables(t.lemma_) >= 4:
                 count_long_words += 1
+
+            if t.pos in (ADJ, ADV):
+                count_adj_adv += 1
+            elif t.pos in (NOUN, VERB):
+                count_noun_verb += 1
+
+        if count_noun_verb <= 0:
+            modification_ratio = 0.0
+        else:
+            modification_ratio = 100*count_adj_adv/count_noun_verb
 
         if count_words < 10:
             # Can't estimate from a short sample
-            return 7.0
+            readability9 = 7.0
+            readability10 = 7.0
         else:
-            return 2.7 + 0.3 * count_long_words/count_words*100
+            readability9 = 2.7 + 0.3 * count_long_words/count_words*100
+            readability10 = 0.7 + 0.3 * count_long_words/count_words*100 \
+                + 0.05 * modification_ratio
+
+        return {
+            'readability': readability10,
+            'readability_long_words': readability9,
+        }
 
     def count_syllables(self, word: str) -> int:
         return self.hyphenate(word).count('-') + 1

@@ -11,6 +11,7 @@ interface EditorViewState {
     count_adverb_words: number,
     count_passive_sentences: number,
     readability: number,
+    readability2: number,
 }
 
 export class EditorView extends React.Component<EditorViewProps, EditorViewState> {
@@ -23,16 +24,21 @@ export class EditorView extends React.Component<EditorViewProps, EditorViewState
             count_adverb_words: 0,
             count_passive_sentences: 0,
             readability: 0,
+            readability2: 0,
         }
     }
 
-    onCountChange = (words: number, sentences: number, adverbs: number, passives: number, readability: number) => {
+    onCountChange = (
+            words: number, sentences: number, adverbs: number, passives: number,
+            readability: number, readability2: number
+    ) => {
         this.setState({
             count_words: words,
             count_sentences: sentences,
             count_adverb_words: adverbs,
             count_passive_sentences: passives,
             readability: readability,
+            readability2: readability2,
         })
     }
 
@@ -48,6 +54,7 @@ export class EditorView extends React.Component<EditorViewProps, EditorViewState
                     count_adverb_words={this.state.count_adverb_words}
                     count_passive_sentences={this.state.count_passive_sentences}
                     readability={this.state.readability}
+                    readability2={this.state.readability2}
                 />
             </Stack>
         );

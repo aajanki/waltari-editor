@@ -6,6 +6,7 @@ interface AnnotationSidebarProps {
     count_adverb_words: number,
     count_passive_sentences: number,
     readability: number,
+    readability2: number,
 }
 
 export function AnnotationSidebar(props: AnnotationSidebarProps) {
@@ -35,6 +36,11 @@ export function AnnotationSidebar(props: AnnotationSidebarProps) {
                 <Card variant='outline'>
                     <CardBody>
                     <Text>Luettavuus (luokkataso): {props.readability.toFixed(1)}</Text>
+                    </CardBody>
+                </Card>
+                <Card variant='outline'>
+                    <CardBody>
+                    <Text>Luettavuus, pitkät sanat: {props.readability2.toFixed(1)}</Text>
                     </CardBody>
                 </Card>
             </Flex>

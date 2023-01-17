@@ -35,7 +35,8 @@ interface AnnotatingEditorProps {
         sentences: number,
         adverbs: number,
         passives: number,
-        readability: number
+        readability: number,
+        readability2: number,
     ) => void
 }
 
@@ -156,6 +157,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
                 response.count_sentences,
                 response.count_adverb_words,
                 response.count_passive_sentences,
+                response.readability,
                 response.readability_long_words,
             );
         }
