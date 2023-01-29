@@ -2,7 +2,7 @@ import re
 import spacy
 from pydantic import BaseModel
 from spacy.symbols import ADJ, ADV, AUX, NOUN, VERB
-from spacy.tokens import Doc
+from spacy.tokens import Doc, Span
 from typing import List
 
 
@@ -49,6 +49,17 @@ class TextAnnotator:
 
         return False
 
+    def strip_space(self, sent: Span) -> Span:
+        start = 0
+        while start < len(sent) and sent[start].is_space:
+            start += 1
+
+        end = len(sent) - 1
+        while end >= 0 and sent[end].is_space:
+            end -= 1
+
+        return sent[start:(end + 1)]
+
     def annotation(self, start, text, label):
         return SpanAnnotation(
             start=start,
@@ -57,15 +68,13 @@ class TextAnnotator:
             label=label,
         )
 
-    def analyze(self, text: str) -> AnnotationResults:
+    def annotate_difficult_words(self, doc):
         annotations: List[SpanAnnotation] = []
-        count_words = 0
         count_sents = 0
         count_adv = 0
         count_pass = 0
         processed_i = -1
 
-        doc = self.nlp(text)
         sentences = doc.sents
         try:
             next_sentence = next(sentences)
@@ -79,8 +88,6 @@ class TextAnnotator:
         for t in doc:
             if t.is_space or t.is_punct:
                 continue
-
-            count_words += 1
 
             if t.i <= processed_i:
                 continue
@@ -121,7 +128,38 @@ class TextAnnotator:
             else:
                 processed_i = t.i
 
+        return annotations, count_adv, count_sents, passive_sentences
+
+    def annotate_difficult_sentences(self, doc: Doc) -> List[SpanAnnotation]:
+        annotations: List[SpanAnnotation] = []
+        for sent in doc.sents:
+            sent = self.strip_space(sent)
+
+            if self.count_words(sent) >= 10:
+                readability = self.readability(sent)['readability']
+
+                print(f'{readability} -- {sent.text}')
+
+                if readability > 9.0:
+                    t = doc[sent.start]
+                    annotations.append(
+                        self.annotation(t.idx, sent.text, 'difficult_sentence'))
+
+        return annotations
+
+    def analyze(self, text: str) -> AnnotationResults:
+        doc = self.nlp(text)
+
+        annotations, count_adv, count_sents, passive_sentences = \
+            self.annotate_difficult_words(doc)
+
+        count_words = self.count_words(doc)
+        #count_adv = 0
+        #count_sents = 0
+        #passive_sentences = []
+        #annotations = self.annotate_difficult_sentences(doc)
         readability = self.readability(doc)
+
         return AnnotationResults(
             annotations=annotations,
             count_words=count_words,
@@ -132,7 +170,7 @@ class TextAnnotator:
             readability_long_words=readability['readability_long_words'],
         )
 
-    def readability(self, doc: Doc) -> float:
+    def readability(self, doc: Doc | Span) -> dict:
         # Compute readability scores for a text span.
         #
         # Generated two scores that estimate text readability based on the 
@@ -178,6 +216,9 @@ class TextAnnotator:
             'readability': readability10,
             'readability_long_words': readability9,
         }
+
+    def count_words(self, doc: Doc | Span):
+        return sum(1 for t in doc if not (t.is_space or t.is_punct))
 
     def count_syllables(self, word: str) -> int:
         return self.hyphenate(word).count('-') + 1
