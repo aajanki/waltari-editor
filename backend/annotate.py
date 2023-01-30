@@ -157,8 +157,10 @@ class TextAnnotator:
         #count_adv = 0
         #count_sents = 0
         #passive_sentences = []
-        #annotations = self.annotate_difficult_sentences(doc)
+        #annotations = annotations + self.annotate_difficult_sentences(doc)
         readability = self.readability(doc)
+
+        annotations = sorted(annotations, key=lambda x: (x.start, -x.length))
 
         return AnnotationResults(
             annotations=annotations,

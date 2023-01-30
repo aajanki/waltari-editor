@@ -169,11 +169,15 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
         const deleteAttributes = Object.fromEntries(annotationTypes.map(x => [x, null]));
 
         // Convert annotations API response to a Delta object
+        annotations.sort((a, b) => a.start - b.start);
         for (const annotation of annotations) {
             let start = annotation.start;
             let length = annotation.length;
 
-            if (i !== start) {
+            if (start < i) {
+                // Skip overlapping annotations
+                continue;
+            } else if (i !== start) {
                 // Remove obsolete annotations
                 ops.push({retain: start - i, attributes: deleteAttributes});
             }
