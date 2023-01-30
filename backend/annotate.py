@@ -3,7 +3,7 @@ import spacy
 from pydantic import BaseModel
 from spacy.symbols import ADJ, ADV, AUX, NOUN, VERB
 from spacy.tokens import Doc, Span
-from typing import List
+from typing import List, Tuple
 
 
 class SpanAnnotation(BaseModel):
@@ -68,10 +68,9 @@ class TextAnnotator:
             label=label,
         )
 
-    def annotate_difficult_words(self, doc):
+    def annotate_difficult_words(self, doc: Doc | Span) -> Tuple[List[SpanAnnotation], int, int]:
         annotations: List[SpanAnnotation] = []
         count_sents = 0
-        count_adv = 0
         count_pass = 0
         processed_i = -1
 
@@ -104,7 +103,6 @@ class TextAnnotator:
 
             if t.pos == ADV:
                 annotations.append(self.annotation(t.idx, t.text, 'adverb'))
-                count_adv += 1
                 processed_i = t.i
             elif t.pos == AUX and t.head.pos == VERB and 'Pass' in t.head.morph.get('Voice') and not t.head.morph.get('Person[psor]'):
                 if self.is_aux_preceding_passive_verb(t):
@@ -128,7 +126,7 @@ class TextAnnotator:
             else:
                 processed_i = t.i
 
-        return annotations, count_adv, count_sents, passive_sentences
+        return annotations, count_sents, sum(passive_sentences)
 
     def annotate_difficult_sentences(self, doc: Doc) -> List[SpanAnnotation]:
         annotations: List[SpanAnnotation] = []
@@ -150,14 +148,13 @@ class TextAnnotator:
     def analyze(self, text: str) -> AnnotationResults:
         doc = self.nlp(text)
 
-        annotations, count_adv, count_sents, passive_sentences = \
+        annotations, count_sents, count_passive_sentences = \
             self.annotate_difficult_words(doc)
 
-        count_words = self.count_words(doc)
-        #count_adv = 0
-        #count_sents = 0
-        #passive_sentences = []
         #annotations = annotations + self.annotate_difficult_sentences(doc)
+
+        count_words = self.count_words(doc)
+        count_adv = sum(1 for x in annotations if x.label == 'adverb')
         readability = self.readability(doc)
 
         annotations = sorted(annotations, key=lambda x: (x.start, -x.length))
@@ -166,7 +163,7 @@ class TextAnnotator:
             annotations=annotations,
             count_words=count_words,
             count_sentences=count_sents,
-            count_passive_sentences=sum(passive_sentences),
+            count_passive_sentences=count_passive_sentences,
             count_adverb_words=count_adv,
             readability=readability['readability'],
             readability_long_words=readability['readability_long_words'],
