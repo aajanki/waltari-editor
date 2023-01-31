@@ -16,12 +16,18 @@ AdverbBlot.blotName = 'adverb';
 AdverbBlot.tagName = 'mark';
 AdverbBlot.className = 'annotation-adverb';
 
+class DifficultBlot extends Inline {}
+DifficultBlot.blotName = 'difficult';
+DifficultBlot.tagName = 'mark';
+DifficultBlot.className = 'annotation-difficult';
+
 Quill.register({
     'formats/adverb': AdverbBlot,
     'formats/passive': PassiveBlot,
+    'formats/difficult': DifficultBlot,
 });
 
-const annotationTypes = ['passive', 'adverb'];
+const annotationTypes = ['passive', 'adverb', 'difficult'];
 
 type SpanAnnotation = {
     start: number;
@@ -169,7 +175,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
         const deleteAttributes = Object.fromEntries(annotationTypes.map(x => [x, null]));
 
         // Convert annotations API response to a Delta object
-        annotations.sort((a, b) => a.start - b.start);
+        annotations.sort(this.annotationSortValue);
         for (const annotation of annotations) {
             let start = annotation.start;
             let length = annotation.length;
@@ -177,7 +183,7 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
             if (start < i) {
                 // Skip overlapping annotations
                 continue;
-            } else if (i !== start) {
+            } else if (start > i) {
                 // Remove obsolete annotations
                 ops.push({retain: start - i, attributes: deleteAttributes});
             }
@@ -202,6 +208,20 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
         if (editor !== null) {
             editor.getEditor().updateContents(delta, 'api');
         }
+    }
+
+    annotationSortValue(a: SpanAnnotation, b: SpanAnnotation): number {
+        const position_diff = a.start - b.start;
+
+        if (position_diff === 0) {
+            if (a.label === "difficult" && a.label !== "difficult") {
+                return -1;
+            } else if (a.label !== "difficult" && a.label === "difficult") {
+                return 1;
+            }
+        }
+
+        return position_diff;
     }
 
     render() {

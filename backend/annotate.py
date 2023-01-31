@@ -131,17 +131,26 @@ class TextAnnotator:
     def annotate_difficult_sentences(self, doc: Doc) -> List[SpanAnnotation]:
         annotations: List[SpanAnnotation] = []
         for sent in doc.sents:
-            sent = self.strip_space(sent)
-
-            if self.count_words(sent) >= 10:
+            word_count = self.count_words(sent)
+            if word_count >= 8:
+                sent = self.strip_space(sent)
                 readability = self.readability(sent)['readability']
 
-                print(f'{readability} -- {sent.text}')
-
-                if readability > 9.0:
+                # The bounds below are guesses. The intuition is that the
+                # readability score estimates are more unreliable on shorter
+                # sentences, and therefore we require a higher readability
+                # score before labeling a short sentence.
+                #
+                # Wiio recommends readability score value 9 as the boundary
+                # between normal and difficult texts (on long documents).
+                if (
+                        (8 <= word_count < 10 and readability > 12.0) or
+                        (10 <= word_count < 12 and readability > 10.0) or
+                        (word_count >= 12 and readability > 9.0)
+                ):
                     t = doc[sent.start]
                     annotations.append(
-                        self.annotation(t.idx, sent.text, 'difficult_sentence'))
+                        self.annotation(t.idx, sent.text, 'difficult'))
 
         return annotations
 
@@ -151,7 +160,7 @@ class TextAnnotator:
         annotations, count_sents, count_passive_sentences = \
             self.annotate_difficult_words(doc)
 
-        #annotations = annotations + self.annotate_difficult_sentences(doc)
+        annotations = annotations + self.annotate_difficult_sentences(doc)
 
         count_words = self.count_words(doc)
         count_adv = sum(1 for x in annotations if x.label == 'adverb')
