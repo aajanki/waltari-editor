@@ -1,19 +1,23 @@
-# Tool for analyzing written Finnish text
+# Waltari editor - analyzing written Finnish text
 
-Running the backend:
+Waltari is a text editor that analyzes Finnish text. It highlights sentences
+that are difficult to understand and sentences that use passive voice.
+
+## Running
+
+Backend:
 
 ```shell
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install wheel
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+pip install -r requirements.txt -r requirements-dev.txt
 
 uvicorn main:app --reload
 ```
 
-Running the frontend:
+Frontend:
 
 ```shell
 cd editor-app
@@ -25,5 +29,6 @@ npm start
 ## Backend unit tests
 
 ```
+cd backend
 python -m pytest
 ```
