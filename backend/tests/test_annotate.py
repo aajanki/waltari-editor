@@ -6,9 +6,9 @@ from annotate import TextAnnotator
 ANALYZE_TEST_CASES = [
     ('A', []),
     ('A ! ,(B)., C / = # %', []),
-    ('Tule jo!', [{'start': 5, 'length': 2, 'text': 'jo', 'label': 'adverb'}]),
+    ('Tule jo!', [{'start': 5, 'length': 2, 'text': None, 'label': 'adverb'}]),
     #('Koulussa on käytävä.', []),
-    ('Koulussa opiskellaan.', [{'start': 9, 'length': 11, 'text': 'opiskellaan', 'label': 'passive'}]),
+    ('Koulussa opiskellaan.', [{'start': 9, 'length': 11, 'text': None, 'label': 'passive'}]),
 ]
 
 SENTENCE_DIFFICULTY_TEST_CASES = \

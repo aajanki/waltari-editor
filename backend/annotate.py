@@ -10,7 +10,7 @@ class SpanAnnotation(BaseModel):
     start: int
     length: int
     label: str
-    text: str
+    text: str | None
 
 
 class AnnotationResults(BaseModel):
@@ -31,6 +31,9 @@ class TextAnnotator:
         lemmatizer_index = self.nlp.pipe_names.index('lemmatizer')
         lemmatizer = self.nlp.pipeline[lemmatizer_index][-1]
         self.hyphenate = lemmatizer.voikko.hyphenate
+
+        # If True, the span text is included in the response to help debugging
+        self.debug = False
 
     def is_passive_voice(self, token):
         morph = token.morph
@@ -64,7 +67,7 @@ class TextAnnotator:
         return SpanAnnotation(
             start=start,
             length=len(text),
-            text=text,
+            text=text if self.debug else None,
             label=label,
         )
 
