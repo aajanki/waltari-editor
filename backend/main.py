@@ -31,7 +31,7 @@ async def root():
 
 
 @app.post("/api/annotate", response_model=AnnotationResults)
-def annotate(contents: Contents):
+async def annotate(contents: Contents):
     return annotator.analyze(contents.text)
 
 
