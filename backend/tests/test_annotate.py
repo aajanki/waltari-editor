@@ -4,11 +4,70 @@ from pathlib import Path
 from annotate import TextAnnotator
 
 ANALYZE_TEST_CASES = [
-    ('A', []),
-    ('A ! ,(B)., C / = # %', []),
-    ('Tule jo!', [{'start': 5, 'length': 2, 'text': None, 'label': 'adverb'}]),
-    #('Koulussa on käytävä.', []),
-    ('Koulussa opiskellaan.', [{'start': 9, 'length': 11, 'text': None, 'label': 'passive'}]),
+    (
+        'A',
+        [],
+        {
+            'words': 1,
+            'sentences': 1,
+            'passives': 0,
+            'adverbs': 0,
+        }
+    ),
+    (
+        'A ! ,(B)., C / = # %',
+        [],
+        {
+            'words': 4,
+            'sentences': 1,
+            'passives': 0,
+            'adverbs': 0,
+        }
+    ),
+    (
+        'Tule jo!',
+        [{'start': 5, 'length': 2, 'text': None, 'label': 'adverb'}],
+        {
+            'words': 2,
+            'sentences': 1,
+            'passives': 0,
+            'adverbs': 1,
+        }
+    ),
+    (
+        'Koulussa opiskellaan kieliä.',
+        [{'start': 9, 'length': 11, 'text': None, 'label': 'passive'}],
+        {
+            'words': 3,
+            'sentences': 1,
+            'passives': 1,
+            'adverbs': 0,
+        }
+    ),
+    (
+        'Tutkitaan asiaa!',
+        [{'start': 0, 'length': 9, 'text': None, 'label': 'passive'}],
+        {
+            'words': 2,
+            'sentences': 1,
+            'passives': 1,
+            'adverbs': 0,
+        }
+    ),
+    (
+        'Jutta käy kerhossa iltapäivisin. Kerhossa leikitään sopuisasti.',
+        [
+            {'start': 19, 'length': 12, 'text': None, 'label': 'adverb'},
+            {'start': 42, 'length': 9, 'text': None, 'label': 'passive'},
+            {'start': 52, 'length': 10, 'text': None, 'label': 'adverb'},
+        ],
+        {
+            'words': 7,
+            'sentences': 2,
+            'passives': 1,
+            'adverbs': 2,
+        }
+    ),
 ]
 
 SENTENCE_DIFFICULTY_TEST_CASES = \
@@ -17,10 +76,25 @@ SENTENCE_DIFFICULTY_TEST_CASES = \
 annotator = TextAnnotator()
 
 
-@pytest.mark.parametrize('text,expected_annotations', ANALYZE_TEST_CASES)
-def test_annotate_simple_sentences(text, expected_annotations):
+def test_annotate_empty_string():
+    analyzed = annotator.analyze('')
+
+    assert len(analyzed.annotations) == 0
+    assert analyzed.count_words == 0
+    assert analyzed.count_sentences == 0
+    assert analyzed.count_passive_sentences == 0
+    assert analyzed.count_adverb_words == 0
+
+
+@pytest.mark.parametrize('text,expected_annotations,expected_counts', ANALYZE_TEST_CASES)
+def test_annotate(text, expected_annotations, expected_counts):
     analyzed = annotator.analyze(text)
+
     assert analyzed.annotations == expected_annotations
+    assert analyzed.count_words == expected_counts['words']
+    assert analyzed.count_adverb_words == expected_counts['adverbs']
+    assert analyzed.count_sentences == expected_counts['sentences']
+    assert analyzed.count_passive_sentences == expected_counts['passives']
 
 
 @pytest.mark.parametrize('text,difficult_sentences', SENTENCE_DIFFICULTY_TEST_CASES)

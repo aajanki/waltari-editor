@@ -3,7 +3,7 @@ import spacy
 from pydantic import BaseModel
 from spacy.symbols import ADJ, ADV, AUX, NOUN, VERB
 from spacy.tokens import Doc, Span
-from typing import List, Tuple
+from typing import List, Iterable
 
 
 class SpanAnnotation(BaseModel):
@@ -71,21 +71,10 @@ class TextAnnotator:
             label=label,
         )
 
-    def annotate_difficult_words(self, doc: Doc | Span) -> Tuple[List[SpanAnnotation], int, int]:
+    def annotate_words(self, doc: Doc | Span) -> List[SpanAnnotation]:
         annotations: List[SpanAnnotation] = []
-        count_sents = 0
         count_pass = 0
         processed_i = -1
-
-        sentences = doc.sents
-        try:
-            next_sentence = next(sentences)
-            next_sentence_start_index = next_sentence.start
-            if not next_sentence.text.isspace():
-                count_sents += 1
-        except StopIteration:
-            next_sentence_start_index = 0
-        passive_sentences = [False]
 
         for t in doc:
             if t.is_space or t.is_punct:
@@ -93,16 +82,6 @@ class TextAnnotator:
 
             if t.i <= processed_i:
                 continue
-
-            if t.i >= next_sentence_start_index:
-                try:
-                    next_sentence = next(sentences)
-                    next_sentence_start_index = next_sentence.start
-                    if not next_sentence.text.isspace():
-                        count_sents += 1
-                    passive_sentences.append(False)
-                except StopIteration:
-                    pass
 
             if t.pos == ADV:
                 annotations.append(self.annotation(t.idx, t.text, 'adverb'))
@@ -122,14 +101,13 @@ class TextAnnotator:
                 if (is_participle and has_aux) or not is_participle:
                     annotations.append(self.annotation(t.idx, t.text, 'passive'))
                     count_pass += 1
-                    passive_sentences[-1] = True
                     processed_i = t.i
                 else:
                     processed_i = t.i
             else:
                 processed_i = t.i
 
-        return annotations, count_sents, sum(passive_sentences)
+        return annotations
 
     def annotate_difficult_sentences(self, doc: Doc) -> List[SpanAnnotation]:
         annotations: List[SpanAnnotation] = []
@@ -157,15 +135,44 @@ class TextAnnotator:
 
         return annotations
 
+    def count_sentences(self, doc: Doc, passive_annotations: Iterable[SpanAnnotation]):
+        count_sentences = 0
+        count_passive_sentences = 0
+        passive_starts = sorted([
+            x.start for x in passive_annotations if x.label == 'passive'
+        ])
+        # Append a sentinel value larger that any character position to avoid
+        # having to worry about an overflow.
+        passive_starts.append(2**64 - 1)
+
+        k = 0
+        for sent in doc.sents:
+            if all(t.is_space or t.is_punct for t in sent) or (sent.end <= sent.start):
+                continue
+
+            count_sentences += 1
+
+            start_token = doc[sent.start]
+            start_i = start_token.idx
+            end_token = doc[sent.end - 1]
+            end_i = end_token.idx + len(end_token)
+
+            while passive_starts[k] < start_i:
+                k += 1
+
+            if start_i <= passive_starts[k] < end_i:
+                count_passive_sentences += 1
+
+        return count_sentences, count_passive_sentences
+
     def analyze(self, text: str) -> AnnotationResults:
         doc = self.nlp(text)
 
-        annotations, count_sents, count_passive_sentences = \
-            self.annotate_difficult_words(doc)
-
+        annotations = self.annotate_words(doc)
         annotations = annotations + self.annotate_difficult_sentences(doc)
 
         count_words = self.count_words(doc)
+        count_sents, count_passive_sentences = self.count_sentences(doc, annotations)
         count_adv = sum(1 for x in annotations if x.label == 'adverb')
         readability = self.readability(doc)
 
