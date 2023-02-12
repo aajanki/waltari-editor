@@ -73,6 +73,9 @@ ANALYZE_TEST_CASES = [
 SENTENCE_DIFFICULTY_TEST_CASES = \
     json.load(open(Path(__file__).parent / 'data' / 'difficult_sentences.json'))
 
+PASSIVE_TEST_CASES = \
+    json.load(open(Path(__file__).parent / 'data' / 'passive.json'))
+
 annotator = TextAnnotator()
 
 
@@ -107,3 +110,16 @@ def test_sentence_difficulty(text, difficult_sentences):
     ]
 
     assert annotated_sentences == difficult_sentences
+
+
+@pytest.mark.parametrize('text,expected_passives', PASSIVE_TEST_CASES)
+def test_passive(text, expected_passives):
+    doc = annotator.nlp(text)
+    annotations = annotator.analyze(doc).annotations
+    observed_passives = [
+        doc.text[ann.start:(ann.start + ann.length)]
+        for ann in annotations
+        if ann.label == 'passive'
+    ]
+
+    assert observed_passives == expected_passives
