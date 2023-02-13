@@ -1,9 +1,9 @@
-import re
 import spacy
 from pydantic import BaseModel
-from spacy.symbols import ADJ, ADV, AUX, NOUN, VERB
+from spacy.matcher import DependencyMatcher
+from spacy.symbols import ADJ, ADV, NOUN, VERB
 from spacy.tokens import Doc, Span
-from typing import List, Iterable
+from typing import Collection, List, Iterable, Tuple
 
 
 class SpanAnnotation(BaseModel):
@@ -26,6 +26,7 @@ class AnnotationResults(BaseModel):
 class TextAnnotator:
     def __init__(self):
         self.nlp = spacy.load('spacy_fi_experimental_web_md', disable=['ner'])
+        self._initialize_adverb_passive_matcher(self.nlp.vocab)
 
         # hyphenate function from libvoikko
         lemmatizer_index = self.nlp.pipe_names.index('lemmatizer')
@@ -35,22 +36,44 @@ class TextAnnotator:
         # If True, the span text is included in the response to help debugging
         self.debug = False
 
-    def is_passive_voice(self, token):
-        morph = token.morph
-        return 'Pass' in morph.get('Voice') and 'Part' not in morph.get('VerbForm')
-
-    def is_aux_preceding_passive_verb(self, token):
-        # Return true if token and all tokens between it and the token's head are
-        # AUX and the head is in passive voice.
-        if token.pos == AUX and token.head.pos == VERB and 'Pass' in token.head.morph.get('Voice'):
-            for steps_right in range(1, token.head.i - token.i):
-                t2 = token.nbor(steps_right)
-                if not (t2.pos == AUX and t2.head.i == token.head.i):
-                    return False
-
-            return True
-
-        return False
+    def _initialize_adverb_passive_matcher(self, vocab):
+        pattern_adverb = [
+            {
+                "RIGHT_ID": "adverb",
+                "RIGHT_ATTRS": {"POS": "ADV"},
+            },
+        ]
+        pattern_passive_verb = [
+            {
+                "RIGHT_ID": "passive_verb",
+                "RIGHT_ATTRS": {
+                    "POS": "VERB",
+                    "MORPH": {"IS_SUPERSET": ["Voice=Pass", "VerbForm=Fin"]}
+                },
+            },
+        ]
+        pattern_passive_aux_verb = [
+            {
+                "RIGHT_ID": "passive_verb",
+                "RIGHT_ATTRS": {
+                    "POS": "VERB",
+                    "MORPH": {"IS_SUPERSET": ["Voice=Pass"]}
+                },
+            },
+            {
+                "LEFT_ID": "passive_verb",
+                "REL_OP": ">",
+                "RIGHT_ID": "passive_aux",
+                "RIGHT_ATTRS": {"POS": "AUX"},
+            },
+        ]
+        self.adverb_passive_matcher = DependencyMatcher(vocab)
+        self.matcher_id_adverb = vocab.strings['adverb']
+        self.adverb_passive_matcher.add(self.matcher_id_adverb, [pattern_adverb])
+        self.matcher_id_passive1 = vocab.strings['passive1']
+        self.adverb_passive_matcher.add(self.matcher_id_passive1, [pattern_passive_verb])
+        self.matcher_id_passive2 = vocab.strings['passive2']
+        self.adverb_passive_matcher.add(self.matcher_id_passive2, [pattern_passive_aux_verb])
 
     def strip_space(self, sent: Span) -> Span:
         start = 0
@@ -71,41 +94,26 @@ class TextAnnotator:
             label=label,
         )
 
-    def annotate_words(self, doc: Doc | Span) -> List[SpanAnnotation]:
+    def annotate_words(self, doc: Doc) -> List[SpanAnnotation]:
         annotations: List[SpanAnnotation] = []
-        count_pass = 0
-        processed_i = -1
+        passive_set = set()
+        matches = self.adverb_passive_matcher(doc)
+        for (match_id, token_ids) in matches:
+            if match_id == self.matcher_id_adverb:
+                for i in token_ids:
+                    t = doc[i]
+                    annotations.append(self.annotation(t.idx, t.text, 'adverb'))
+            else:  # passive
+                # Filter out "Alaikäinen voi kirjauduttuaan" type constructs.
+                # This is done here because doing it in the matcher is difficult.
+                if len(token_ids) > 1 and doc[token_ids[0]].morph.get('Person[psor]'):
+                    continue
 
-        for t in doc:
-            if t.is_space or t.is_punct:
-                continue
+                passive_set.update(token_ids)
 
-            if t.i <= processed_i:
-                continue
-
-            if t.pos == ADV:
-                annotations.append(self.annotation(t.idx, t.text, 'adverb'))
-                processed_i = t.i
-            elif t.pos == AUX and t.head.pos == VERB and 'Pass' in t.head.morph.get('Voice') and not t.head.morph.get('Person[psor]'):
-                if self.is_aux_preceding_passive_verb(t):
-                    text_span = ''.join(t.nbor(i).text_with_ws for i in range(0, t.head.i - t.i + 1))
-                    text_span = re.sub(r'\s*$', '', text_span)
-                    annotations.append(self.annotation(t.idx, text_span, 'passive'))
-                    processed_i = t.head.i
-                else:
-                    annotations.append(self.annotation(t.idx, t.text, 'passive'))
-                    processed_i = t.i
-            elif t.pos == VERB and 'Pass' in t.morph.get('Voice') and not t.morph.get('Person[psor]'):
-                is_participle = 'Part' in t.morph.get('VerbForm')
-                has_aux = any(x.pos == AUX for x in t.children)
-                if (is_participle and has_aux) or not is_participle:
-                    annotations.append(self.annotation(t.idx, t.text, 'passive'))
-                    count_pass += 1
-                    processed_i = t.i
-                else:
-                    processed_i = t.i
-            else:
-                processed_i = t.i
+        for start, end in consecutive_ranges(passive_set):
+            text = doc[start:end].text
+            annotations.append(self.annotation(doc[start].idx, text, 'passive'))
 
         return annotations
 
@@ -240,3 +248,24 @@ class TextAnnotator:
 
     def count_syllables(self, word: str) -> int:
         return self.hyphenate(word).count('-') + 1
+
+
+def consecutive_ranges(xs: Collection[int]) -> List[Tuple[int, int]]:
+    if len(xs) == 0:
+        return []
+
+    sorted_xs = sorted(xs)
+
+    ranges = []
+    start = sorted_xs[0]
+    prev = sorted_xs[0]
+    for x in sorted_xs[1:]:
+        if x != prev + 1:
+            ranges.append((start, prev + 1))
+            start = x
+
+        prev = x
+
+    ranges.append((start, prev + 1))
+
+    return ranges
