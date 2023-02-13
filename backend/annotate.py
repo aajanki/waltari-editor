@@ -86,14 +86,6 @@ class TextAnnotator:
 
         return sent[start:(end + 1)]
 
-    def annotation(self, start, text, label):
-        return SpanAnnotation(
-            start=start,
-            length=len(text),
-            text=text if self.debug else None,
-            label=label,
-        )
-
     def annotate_words(self, doc: Doc) -> List[SpanAnnotation]:
         annotations: List[SpanAnnotation] = []
         passive_set = set()
@@ -102,7 +94,7 @@ class TextAnnotator:
             if match_id == self.matcher_id_adverb:
                 for i in token_ids:
                     t = doc[i]
-                    annotations.append(self.annotation(t.idx, t.text, 'adverb'))
+                    annotations.append(self.annotation_token(t, 'adverb'))
             else:  # passive
                 # Filter out "Alaikäinen voi kirjauduttuaan" type constructs.
                 # This is done here because doing it in the matcher is difficult.
@@ -112,8 +104,10 @@ class TextAnnotator:
                 passive_set.update(token_ids)
 
         for start, end in consecutive_ranges(passive_set):
-            text = doc[start:end].text
-            annotations.append(self.annotation(doc[start].idx, text, 'passive'))
+            if end == start + 1:
+                annotations.append(self.annotation_token(doc[start], 'passive'))
+            else:
+                annotations.append(self.annotation_span(doc, start, end, 'passive'))
 
         return annotations
 
@@ -137,9 +131,8 @@ class TextAnnotator:
                         (10 <= word_count < 12 and readability > 10.0) or
                         (word_count >= 12 and readability > 9.0)
                 ):
-                    t = doc[sent.start]
                     annotations.append(
-                        self.annotation(t.idx, sent.text, 'difficult'))
+                        self.annotation_span(doc, sent.start, sent.end, 'difficult'))
 
         return annotations
 
@@ -248,6 +241,34 @@ class TextAnnotator:
 
     def count_syllables(self, word: str) -> int:
         return self.hyphenate(word).count('-') + 1
+
+    def annotation_token(self, token, label):
+        return SpanAnnotation(
+            start=token.idx,
+            length=len(token),
+            text=token.text if self.debug else None,
+            label=label,
+        )
+
+    def annotation_span(self, doc, start, end, label):
+        if self.debug:
+            text = doc[start:end].text
+        else:
+            text = None
+
+        start_token = doc[start]
+        if end > start:
+            last_token = doc[end - 1]
+            num_chars = last_token.idx + len(last_token) - start_token.idx
+        else:
+            num_chars = 0
+
+        return SpanAnnotation(
+            start=start_token.idx,
+            length=num_chars,
+            text=text,
+            label=label,
+        )
 
 
 def consecutive_ranges(xs: Collection[int]) -> List[Tuple[int, int]]:
