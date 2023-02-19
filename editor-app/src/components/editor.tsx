@@ -172,7 +172,8 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
     updateAnnotations = (annotations: SpanAnnotation[], textLength: number) : void => {
         let i = 0;
         let ops: DeltaOperation[] = [];
-        const deleteAttributes = Object.fromEntries(annotationTypes.map(x => [x, null]));
+        const deleteAttributes: {[k: string]: boolean | null} =
+            Object.fromEntries(annotationTypes.map(x => [x, null]));
 
         // Convert annotations API response to a Delta object
         annotations.sort(this.annotationSortValue);
@@ -188,8 +189,9 @@ export class AnnotatingEditor extends React.Component<AnnotatingEditorProps> {
                 ops.push({retain: start - i, attributes: deleteAttributes});
             }
 
-            // Add the new annotation
-            ops.push({retain: length, attributes: {[annotation.label]: true}});
+            // Add the new annotation. Delete potential existing overlapping annotations.
+            const attributes = Object.assign({}, deleteAttributes, {[annotation.label]: true})
+            ops.push({retain: length, attributes: attributes});
 
             i = start + length;
         }
