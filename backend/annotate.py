@@ -127,9 +127,9 @@ class TextAnnotator:
                 # Wiio recommends readability score value 9 as the boundary
                 # between normal and difficult texts (on long documents).
                 if (
-                        (8 <= word_count < 10 and readability > 12.0) or
-                        (10 <= word_count < 12 and readability > 10.0) or
-                        (word_count >= 12 and readability > 9.0)
+                        (8 <= word_count < 12 and readability > 13.0) or
+                        (12 <= word_count < 16 and readability > 11.0) or
+                        (word_count >= 16 and readability > 9.0)
                 ):
                     annotations.append(
                         self.annotation_span(doc, sent.start, sent.end, 'difficult'))
